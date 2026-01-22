@@ -393,19 +393,26 @@ class RunMessages(BaseModel):
 
 
 class HITLDecision(BaseModel):
-    """User decision from HITL interrupt."""
+    """User decision from HITL interrupt.
+
+    Extracted from BatchApprovalResponse in approval analyzer traces.
+    Maps: accept -> approved, reject -> rejected (with optional user_message).
+    """
 
     product_index: int
-    """Index of product in batch."""
+    """Index of product/interrupt in batch (0-indexed)."""
 
     action: str
-    """User action: 'approved' | 'edited' | 'rejected'."""
+    """User action: 'approved' | 'rejected'."""
 
-    original_data: dict[str, Any]
-    """Original extracted product data."""
+    user_message: str | None = None
+    """User's feedback message for rejections (from BatchApprovalResponse.user_message)."""
+
+    original_data: dict[str, Any] = Field(default_factory=dict)
+    """Original extracted product data (if available from interrupt context)."""
 
     edited_data: dict[str, Any] | None = None
-    """Edited data if action was 'edited'."""
+    """Edited data if action was 'edited' (deprecated - use user_message for feedback)."""
 
 
 class WorkflowTrace(BaseModel):

@@ -366,12 +366,13 @@ def get_workflow_story(trace_ids: list[str]) -> WorkflowStory:
         # Detect HITL interrupt
         is_hitl_interrupt = _detect_hitl_interrupt(overview)
 
-        # Extract HITL decisions from next trace if this was an interrupt
+        # Extract HITL decisions from approval analyzer trace if this was an interrupt
         hitl_decisions = []
-        if is_hitl_interrupt and idx < len(trace_ids):
-            # Decisions are in the NEXT trace's inputs
-            next_trace_id = trace_ids[idx]
-            hitl_decisions = _extract_hitl_decisions(next_trace_id)
+        if is_hitl_interrupt:
+            # Approval analyzer trace is BETWEEN interrupt and resume traces
+            # Pass current trace (interrupt) and optionally next trace (resume)
+            next_trace_id = trace_ids[idx] if idx < len(trace_ids) else None
+            hitl_decisions = _extract_hitl_decisions(trace_id, next_trace_id)
 
         workflow_traces.append(
             WorkflowTrace(
@@ -424,40 +425,167 @@ def _detect_hitl_interrupt(overview: TraceOverview) -> bool:
     return any(has_interrupt(root) for root in overview.run_tree)
 
 
-def _extract_hitl_decisions(trace_id: str) -> list[HITLDecision]:
-    """Extract user HITL decisions from resume trace inputs."""
+def _find_approval_analyzer_trace(
+    session_id: str, after_time: datetime, before_time: datetime
+) -> str | None:
+    """Find approval analyzer trace in session within time window.
+
+    Approval analyzer traces are identified by:
+    - Standalone trace (run_type=chain, is_root=True)
+    - Output contains BatchApprovalResponse structure (responses + reasoning keys)
+    - Occurs between HITL interrupt trace and resume trace
+
+    Args:
+        session_id: Session ID to search in (LangSmith session/project)
+        after_time: Start of time window (HITL interrupt end time)
+        before_time: End of time window (resume trace start time)
+
+    Returns:
+        Trace ID of approval analyzer, or None if not found.
+    """
     client = _get_client()
 
-    # Get first run of trace (should have HITL response in inputs)
-    runs = list(client.list_runs(trace_id=trace_id, limit=1))
-    if not runs:
+    # Query root-level chain traces in the session
+    # LangSmith requires session as a list parameter
+    runs = list(
+        client.list_runs(
+            session=[session_id],
+            run_type="chain",
+            is_root=True,
+            limit=50,
+        )
+    )
+
+    # Filter by time window and find approval analyzer by output structure
+    candidates = []
+    for run in runs:
+        # Check time window
+        if not run.start_time:
+            continue
+        if not (after_time <= run.start_time < before_time):
+            continue
+
+        # Skip if no outputs
+        if not run.outputs:
+            continue
+
+        outputs = run.outputs
+        # Check for BatchApprovalResponse structure
+        if isinstance(outputs, dict):
+            # Direct output format
+            if "responses" in outputs and "reasoning" in outputs:
+                candidates.append((run.start_time, str(run.trace_id)))
+            # Nested under 'output' key
+            elif "output" in outputs:
+                inner = outputs["output"]
+                if isinstance(inner, dict) and "responses" in inner and "reasoning" in inner:
+                    candidates.append((run.start_time, str(run.trace_id)))
+
+    # Return the earliest matching trace (closest to interrupt)
+    if candidates:
+        candidates.sort(key=lambda x: x[0])
+        return candidates[0][1]
+
+    return None
+
+
+def _extract_hitl_decisions(
+    interrupt_trace_id: str, resume_trace_id: str | None = None
+) -> list[HITLDecision]:
+    """Extract user HITL decisions from approval analyzer trace.
+
+    The approval analyzer creates a separate trace containing BatchApprovalResponse
+    with structured user decisions. This function:
+    1. Finds the approval analyzer trace between interrupt and resume traces
+    2. Extracts BatchApprovalResponse from its outputs
+    3. Maps to HITLDecision objects
+
+    Args:
+        interrupt_trace_id: Trace ID that ended with HITL interrupt
+        resume_trace_id: Optional trace ID of the resume (helps narrow time window)
+
+    Returns:
+        List of HITLDecision objects from approval analyzer output.
+    """
+    client = _get_client()
+
+    # Get interrupt trace metadata for session and time
+    try:
+        interrupt_run = client.read_run(interrupt_trace_id)
+    except Exception:
         return []
 
-    run = client.read_run(runs[0].id)
-    inputs = run.inputs
+    session_id = interrupt_run.session_id
+    interrupt_time = interrupt_run.end_time or interrupt_run.start_time
 
-    # Look for approval decisions in inputs
-    # This is simplified - real implementation would parse approval_analyzer output
+    if not session_id or not interrupt_time:
+        return []
+
+    # Determine time window for approval analyzer
+    # It should be after interrupt but before resume (or within reasonable window)
+    if resume_trace_id:
+        try:
+            resume_run = client.read_run(resume_trace_id)
+            end_time = resume_run.start_time
+        except Exception:
+            end_time = interrupt_time + timedelta(minutes=30)
+    else:
+        # Default: look within 30 minutes after interrupt
+        end_time = interrupt_time + timedelta(minutes=30)
+
+    # Find approval analyzer trace
+    analyzer_trace_id = _find_approval_analyzer_trace(
+        session_id=str(session_id), after_time=interrupt_time, before_time=end_time
+    )
+
+    if not analyzer_trace_id:
+        return []
+
+    # Read approval analyzer outputs
+    try:
+        analyzer_run = client.read_run(analyzer_trace_id)
+    except Exception:
+        return []
+
+    outputs = analyzer_run.outputs
+    if not outputs:
+        return []
+
+    # Extract BatchApprovalResponse
+    approval_response = None
+    if isinstance(outputs, dict):
+        if "responses" in outputs and "reasoning" in outputs:
+            approval_response = outputs
+        elif "output" in outputs:
+            inner = outputs["output"]
+            if isinstance(inner, dict) and "responses" in inner:
+                approval_response = inner
+
+    if not approval_response:
+        return []
+
+    # Map responses to HITLDecision objects
     decisions = []
+    responses = approval_response.get("responses", [])
 
-    # Check if inputs contain approval data structure
-    if isinstance(inputs, dict) and "messages" in inputs:
-        messages = inputs["messages"]
-        for msg in messages:
-            if isinstance(msg, dict) and msg.get("type") == "human":
-                content = msg.get("content", "")
-                # Parse approval responses (simplified)
-                # Real implementation would match actual approval_analyzer format
-                if "approved" in content.lower():
-                    # Extract product data from content
-                    # This is a placeholder - actual parsing would be more sophisticated
-                    decisions.append(
-                        HITLDecision(
-                            product_index=len(decisions),
-                            action="approved",
-                            original_data={},
-                        )
-                    )
+    for idx, resp in enumerate(responses):
+        if not isinstance(resp, dict):
+            continue
+
+        resp_type = resp.get("type", "")
+        user_message = resp.get("user_message")
+
+        # Map: accept -> approved, reject -> rejected
+        action = "approved" if resp_type == "accept" else "rejected"
+
+        decisions.append(
+            HITLDecision(
+                product_index=idx,
+                action=action,
+                user_message=user_message,
+                original_data={},  # Could be enriched from interrupt context
+            )
+        )
 
     return decisions
 

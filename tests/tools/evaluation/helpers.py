@@ -1297,21 +1297,26 @@ def get_workflow_window(
         print(f"No start_time found for trace: {trace_id}")
         return []
 
-    # Calculate time window
-    window_start = run.start_time - timedelta(hours=hours_before)
-    window_end = run.start_time + timedelta(hours=hours_after)
+    # Calculate time window centered on source trace
+    source_time = run.start_time
+    window_start = source_time - timedelta(hours=hours_before)
+    window_end = source_time + timedelta(hours=hours_after)
 
     # Format times for LangSmith filter (ISO format)
     start_iso = window_start.isoformat()
     end_iso = window_end.isoformat()
 
-    # Query with time bounds - O(window) instead of O(entire session)
+    # Query with higher limit to ensure we capture traces around source
+    # LangSmith returns arbitrary subset when limited, so we fetch more
+    # and then trim to max_traces centered on source
+    query_limit = max(max_traces * 3, 60)
+
     session_runs = list(
         client.list_runs(
             project_name="autifyme-dev",
             is_root=True,
             filter=f'and(eq(session_id, "{run.session_id}"), gte(start_time, "{start_iso}"), lte(start_time, "{end_iso}"))',
-            limit=max_traces,
+            limit=query_limit,
         )
     )
 
@@ -1320,6 +1325,25 @@ def get_workflow_window(
 
     # Sort by start_time (ascending = chronological)
     session_runs.sort(key=lambda x: x.start_time or datetime.min)
+
+    # Find source trace position and return window centered on it
+    source_idx = None
+    for i, r in enumerate(session_runs):
+        if str(r.id) == trace_id or str(r.trace_id) == trace_id:
+            source_idx = i
+            break
+
+    if source_idx is not None and len(session_runs) > max_traces:
+        # Center window on source trace
+        half_window = max_traces // 2
+        start_idx = max(0, source_idx - half_window)
+        end_idx = min(len(session_runs), start_idx + max_traces)
+
+        # Adjust if we hit the end
+        if end_idx - start_idx < max_traces:
+            start_idx = max(0, end_idx - max_traces)
+
+        session_runs = session_runs[start_idx:end_idx]
 
     # Build result with session boundary detection
     result = []
