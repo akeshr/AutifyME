@@ -91,7 +91,8 @@
       "Skill(evaluate)",
       "Skill(evaluate:*)",
       "Skill(eval)",
-      "Bash(copy:*)"
+      "Bash(copy:*)",
+      "Bash(where:*)"
     ],
     "deny": [],
     "ask": []
