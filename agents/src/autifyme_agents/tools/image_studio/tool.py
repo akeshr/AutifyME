@@ -304,7 +304,7 @@ def _get_gemini3_image_llm(
 
     # Default temperature 0.7 for catalog work - balanced consistency
     # Override Gemini 3's default of 1.0 which causes high variance
-    effective_temperature = temperature if temperature is not None else 0.4
+    effective_temperature = temperature if temperature is not None else 0.5
     print(f"Using Gemini 3 Pro Image temperature: {effective_temperature}")
 
     return get_llm(
@@ -313,7 +313,7 @@ def _get_gemini3_image_llm(
         response_modalities=["TEXT", "IMAGE"],
         image_aspect_ratio=aspect_ratio,
         image_size=image_size,
-        temperature=1.0,
+        temperature=effective_temperature,
         seed=seed,
     )
 
