@@ -36,6 +36,7 @@ from .specialist_graders import (
     specialist_hitl_respected,
     specialist_protocol_loaded,
     specialist_read_upstream,
+    transparency_spec_elevated,
 )
 
 # Type alias for grader functions
@@ -86,6 +87,11 @@ CREATIVE_SPECIALIST_GRADERS: list[tuple[str, GraderFn, dict]] = [
     (
         "image_studio_consistency_params",
         image_studio_consistency_params,
+        {"agent": "creative_specialist"},
+    ),
+    (
+        "transparency_spec_elevated",
+        transparency_spec_elevated,
         {"agent": "creative_specialist"},
     ),
 ]

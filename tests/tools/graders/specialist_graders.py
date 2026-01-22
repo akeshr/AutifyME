@@ -884,6 +884,155 @@ def image_studio_consistency_params(
     )
 
 
+def transparency_spec_elevated(
+    seq: ToolCallSequence, agent: str = "creative_specialist"
+) -> GraderResult:
+    """Check if transparent materials have clarity elevated to 95%+.
+
+    Visual analysts report what's VISIBLE (often 80-90% due to photo quality).
+    Creative specialists must ELEVATE clarity to the material's TRUE potential:
+    - Crystal clear PET: 95%+
+    - Tinted PET: 95%+
+    - Clear glass: 95-100%
+
+    Using analyst-level clarity (85%) produces opaque/milky renders.
+
+    Args:
+        seq: ToolCallSequence from get_tool_call_sequence()
+        agent: Agent to check (default: creative_specialist)
+
+    Returns:
+        GraderResult with pass/fail and evidence
+    """
+    agent_calls = [tc for tc in seq.tool_calls if tc.agent == agent]
+    image_studio_calls = [tc for tc in agent_calls if tc.tool_name == "image_studio"]
+
+    if not image_studio_calls:
+        return GraderResult(
+            name="transparency_spec_elevated",
+            passed=True,
+            score=1.0,
+            evidence={"agent": agent, "image_studio_calls": 0},
+            reason=f"No image_studio calls found for {agent} - grader not applicable",
+            category=GraderCategory.SPECIALIST,
+            severity="LOW",
+        )
+
+    # Keywords that indicate transparent material requiring clarity elevation
+    transparent_keywords = [
+        "clear",
+        "transparent",
+        "crystal",
+        "glass",
+        "pet",
+        "see-through",
+        "translucent",
+    ]
+
+    # Keywords for materials that should NOT have elevated clarity (frosted, diffused)
+    non_elevated_keywords = ["frosted", "diffused", "matte", "opaque", "cloudy"]
+
+    calls_with_low_clarity: list[dict] = []
+    transparent_calls_total = 0
+
+    for tc in image_studio_calls:
+        args = tc.parsed_args or {}
+        material_treatment = args.get("material_treatment", {})
+
+        # Extract material description for keyword matching
+        material_str = ""
+        if isinstance(material_treatment, dict):
+            material_str = " ".join(str(v).lower() for v in material_treatment.values())
+        elif isinstance(material_treatment, str):
+            material_str = material_treatment.lower()
+
+        # Check if this is a transparent material call
+        is_transparent = any(kw in material_str for kw in transparent_keywords)
+        is_non_elevated = any(kw in material_str for kw in non_elevated_keywords)
+
+        # Skip if not transparent OR if it's frosted/diffused (no elevation needed)
+        if not is_transparent or is_non_elevated:
+            continue
+
+        transparent_calls_total += 1
+
+        # Check clarity_percentage
+        clarity = None
+        if isinstance(material_treatment, dict):
+            clarity = material_treatment.get("clarity_percentage")
+            # Also check rendering_notes for clarity mentions
+            rendering_notes = material_treatment.get("rendering_notes", "")
+            if clarity is None and "clarity" in str(rendering_notes).lower():
+                # Try to extract percentage from notes like "95% clarity"
+                import re
+
+                match = re.search(r"(\d+)%?\s*clarity", str(rendering_notes).lower())
+                if match:
+                    clarity = int(match.group(1))
+
+        # If clarity specified but below 95%, flag it
+        if clarity is not None and clarity < 95:
+            calls_with_low_clarity.append(
+                {
+                    "sequence": tc.sequence,
+                    "clarity_percentage": clarity,
+                    "material_preview": material_str[:100],
+                    "issue": f"Transparent material with {clarity}% clarity - should be 95%+",
+                }
+            )
+
+    # If no transparent material calls, grader not applicable
+    if transparent_calls_total == 0:
+        return GraderResult(
+            name="transparency_spec_elevated",
+            passed=True,
+            score=1.0,
+            evidence={
+                "agent": agent,
+                "image_studio_calls": len(image_studio_calls),
+                "transparent_calls": 0,
+            },
+            reason="No transparent material calls found - clarity elevation check not applicable",
+            category=GraderCategory.SPECIALIST,
+            severity="LOW",
+        )
+
+    if not calls_with_low_clarity:
+        return GraderResult(
+            name="transparency_spec_elevated",
+            passed=True,
+            score=1.0,
+            evidence={
+                "agent": agent,
+                "image_studio_calls": len(image_studio_calls),
+                "transparent_calls": transparent_calls_total,
+                "all_elevated": True,
+            },
+            reason=f"All {transparent_calls_total} transparent material call(s) have properly elevated clarity (95%+)",
+            category=GraderCategory.SPECIALIST,
+            severity="HIGH",
+        )
+    else:
+        score = max(0.0, 1.0 - (len(calls_with_low_clarity) / transparent_calls_total))
+        return GraderResult(
+            name="transparency_spec_elevated",
+            passed=False,
+            score=score,
+            evidence={
+                "agent": agent,
+                "image_studio_calls": len(image_studio_calls),
+                "transparent_calls": transparent_calls_total,
+                "calls_with_low_clarity": calls_with_low_clarity,
+            },
+            reason=(
+                f"{len(calls_with_low_clarity)} of {transparent_calls_total} transparent material call(s) "
+                f"have low clarity (<95%) - produces opaque/milky output instead of crystal clear"
+            ),
+            category=GraderCategory.SPECIALIST,
+            severity="HIGH",
+        )
+
+
 def specialist_hitl_respected(
     seq: ToolCallSequence,
     agent: str,
