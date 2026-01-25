@@ -188,10 +188,13 @@ class WorkflowRunner:
         sender_name = None
 
         for msg in messages:
-            # Collect text content (message text + captions)
+            # Collect text content - webhook stores text in ONE field only:
+            # - text_content: for text-only messages
+            # - caption: for media messages with captions
+            # This prevents duplication when both fields had the same value
             if msg.get("text_content"):
                 texts.append(msg["text_content"])
-            if msg.get("caption"):
+            elif msg.get("caption"):  # elif, not if - they're mutually exclusive now
                 texts.append(msg["caption"])
 
             # Collect media IDs
@@ -807,21 +810,26 @@ class WorkflowRunner:
             # Use `or ""` to handle explicit None values (not just missing keys)
             user_text = raw_payload.get("text") or ""
 
+            # Include sender context for PM personalization
+            # Format: "[From: Display Name] message..." if sender_name available
+            sender_name = raw_payload.get("sender_name")
+            if sender_name:
+                user_text = f"[From: {sender_name}] {user_text}"
+
             # Handle batch scenario (media_ids array) or single message (media_id)
             media_ids = raw_payload.get("media_ids", [])
             media_id = raw_payload.get("media_id")
 
             # Build natural language message that includes media reference(s) when present
             # PM needs media_id(s) explicitly to call download_media tool
+            #
+            # NOTE: Batch messages (media_ids populated) already have media summary
+            # appended during batch processing in handle_message_batch().
+            # Only single-message path needs summary added here.
             if media_ids:
-                # Batch scenario: multiple media attachments
-                media_refs = ", ".join(media_ids)
-                if user_text:
-                    # Text + media batch: append all media_ids to user message
-                    user_text = f"{user_text} [media attachments ({len(media_ids)}): {media_refs}]"
-                else:
-                    # Media batch only: create descriptive message with all media_ids
-                    user_text = f"[{len(media_ids)} media attachment(s): {media_refs}]"
+                # Batch scenario: text already contains media summary from batch processing
+                # Don't add another summary - it would cause duplication
+                pass
             elif media_id:
                 # Single media scenario (backward compat)
                 if user_text:

@@ -626,16 +626,17 @@ async def receive(
 
                     if should_batch:
                         # Queue for batch processing
+                        # IMPORTANT: For media messages, caption goes in 'caption' field only
+                        # For text messages, text goes in 'text_content' field only
+                        # This prevents duplication in batch processing
                         await batcher.queue_message(
                             message_id=message_id,
                             sender_id=sender,
                             thread_id=thread_id,
                             message_type=msg_type or "text",
-                            text_content=text,
+                            text_content=text if not media_id else None,  # Text-only messages
                             media_id=media_id,
-                            caption=text
-                            if media_id
-                            else None,  # Caption is text when media present
+                            caption=text if media_id else None,  # Media captions only
                             sender_name=sender_name,
                             received_at=received_at,
                             runner=runner,
