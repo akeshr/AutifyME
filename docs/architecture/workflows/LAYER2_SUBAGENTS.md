@@ -2,7 +2,7 @@
 
 This document defines the **SubAgent roster** used by the PM and the exact boundaries that keep delegation clean.
 
-In runtime, the PM “sees” these as the `name` + `description` fields on each subagent spec returned by the factories in:
+In runtime, the PM "sees" these as the `name` + `description` fields on each subagent spec returned by the factories in:
 
 - `agents/src/autifyme_agents/analysts/*.py`
 - `agents/src/autifyme_agents/specialists/*.py`
@@ -34,7 +34,7 @@ Layer 2 depends on the Layer 1 tool contract catalog:
 ### `catalog_analyst`
 
 - **ROLE**: Analyst (read-only)
-- **MISSION**: Answer “What do we already have?” from our catalog database.
+- **MISSION**: Answer "What do we already have?" from our catalog database.
 - **INPUTS**: What to compare against (keywords/attributes) and any candidate IDs; optional image paths.
 - **OUTPUTS**: Ranked similar items + evidence (IDs/fields/aggregates); write results to thread dir if long.
 - **TOOLS**: `inspect_schema` (Type A), `read_data` (Type A), `aggregate_data` (Type A), `view_image` (Type C)

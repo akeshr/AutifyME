@@ -28,7 +28,7 @@ Layer 1: Tool Descriptions ← START HERE
 
 The bottom-up prompt-first layering is correct, but it currently lacks a small set of **shared invariants** that prevent the exact anti-patterns documented in `AGENT_TOOL_REDESIGN.md` (role ambiguity, redundant work, inconsistent delegation/context, fragile multi-step coordination).
 
-This is intentionally NOT a fixed workflow system. It’s a minimal set of contracts so dynamic orchestration stays stable.
+This is intentionally NOT a fixed workflow system. It's a minimal set of contracts so dynamic orchestration stays stable.
 
 ### 0.1 Role Boundary Decision (PM vs Analysts vs Specialists)
 
@@ -45,9 +45,9 @@ This is intentionally NOT a fixed workflow system. It’s a minimal set of contr
 
 ### 0.2 Context Packet Contract (PM → Subagent)
 
-**Problem:** “delegate with context (not instructions)” is right but underspecified, causing under/over-context and inconsistent handoffs.
+**Problem:** "delegate with context (not instructions)" is right but underspecified, causing under/over-context and inconsistent handoffs.
 
-Define a minimal, consistent context packet (even if it’s just prompt text) that always includes:
+Define a minimal, consistent context packet (even if it's just prompt text) that always includes:
 - `thread_dir`: path like `workspace/thread_123/`
 - `user_intent`: 1-2 lines, intent only (no analysis)
 - `inputs`: media paths, entity refs, record IDs, workspace location
@@ -72,7 +72,7 @@ Add prompt-level rules (applies to PM and specialists):
 
 ### 0.5 Validation Gates (How you prove the redesign works)
 
-Add explicit gates so you don’t “feel” autonomy—you measure it:
+Add explicit gates so you don't "feel" autonomy—you measure it:
 - **Routing gate:** correct domain selection on a fixed scenario set
 - **Redundancy gate:** no duplicate image viewing / duplicate catalog queries when analyst context exists
 - **Resilience gate:** tool failures trigger fallbacks + structured escalation, not workflow death

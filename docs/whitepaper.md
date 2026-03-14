@@ -5,7 +5,7 @@
 
 ## Executive Summary
 
-AutifyME is building the world’s first **Agentic Business Operating System**: a system that automates and orchestrates end-to-end business functions using AI agents, domain specialists, and deterministic tools. It enables businesses of all sizes—from startups with no online presence to established enterprises needing modernization—to instantly operationalize their catalogs, websites, marketing, CRM, inventory, billing, HR, procurement, production, and compliance.  
+AutifyME is building the world's first **Agentic Business Operating System**: a system that automates and orchestrates end-to-end business functions using AI agents, domain specialists, and deterministic tools. It enables businesses of all sizes—from startups with no online presence to established enterprises needing modernization—to instantly operationalize their catalogs, websites, marketing, CRM, inventory, billing, HR, procurement, production, and compliance.  
 
 This whitepaper outlines the architecture, operating model, roadmap, risks, and strategy for making AutifyME a production-grade system that can be run by a solo founder yet scale to serve millions of businesses. The current implementation focuses on validating the architecture through the **Cataloging Workflow MVP**; subsequent sections call out which capabilities exist today versus those planned for the full Business OS rollout.
 
@@ -17,7 +17,7 @@ This whitepaper outlines the architecture, operating model, roadmap, risks, and 
 - **For businesses with weak websites and assets**: AutifyME rebuilds their site, assets, and marketing content.  
 - **For businesses with partial digital maturity**: AutifyME upgrades operations across marketing, CRM, billing, inventory, shipping, HR, and beyond.  
 
-The system’s principle: **every business task that can be made agentic, will be**. Agents collaborate with specialists and use tools to automate execution, while human-in-the-loop checkpoints enforce trust and compliance.
+The system's principle: **every business task that can be made agentic, will be**. Agents collaborate with specialists and use tools to automate execution, while human-in-the-loop checkpoints enforce trust and compliance.
 
 ---
 

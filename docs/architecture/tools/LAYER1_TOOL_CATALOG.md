@@ -14,9 +14,9 @@ Agents must not assume every tool returns `{success: ...}`.
 
 ### `inspect_schema` (Type A)
 
-- **Purpose**: Discover tables/columns/relationships so you don’t guess schema.
-- **Use when**: You’re unsure about table names, column names/types, foreign keys, relation join syntax.
-- **Don’t use**: To fetch actual entity rows (use `read_data`).
+- **Purpose**: Discover tables/columns/relationships so you don't guess schema.
+- **Use when**: You're unsure about table names, column names/types, foreign keys, relation join syntax.
+- **Don't use**: To fetch actual entity rows (use `read_data`).
 - **Returns**: Type A (success-wrapped dict) with table/schema details.
 - **Notes**: Prefer `details=["relationships"]` before using `relations` in `read_data`.
 
@@ -27,25 +27,25 @@ Agents must not assume every tool returns `{success: ...}`.
   - Duplicate checks before any create
   - Resolving foreign keys (get IDs)
   - Fetching current state before update/delete
-- **Don’t use**: GROUP BY analytics (use `aggregate_data`) or any writes (use `write_data`).
+- **Don't use**: GROUP BY analytics (use `aggregate_data`) or any writes (use `write_data`).
 - **Inputs**:
   - `filters`: exact equality / IN matching (no wildcards)
   - `search_patterns`: text search using `%` wildcards (case-insensitive ILIKE)
 - **Returns**: Type A with `operation` in `{query|batch_read|count}`.
-- **Gotcha**: If you’re searching human text and you didn’t include `%`, you probably meant `search_patterns`.
+- **Gotcha**: If you're searching human text and you didn't include `%`, you probably meant `search_patterns`.
 
 ### `aggregate_data` (Type A)
 
 - **Purpose**: Analytics with aggregates, optional `group_by`, optional `having`.
 - **Use when**: Counting/summing/averaging across many rows; finding outliers; grouping by families/categories.
-- **Don’t use**: Fetching entity details (use `read_data`).
+- **Don't use**: Fetching entity details (use `read_data`).
 - **Returns**: Type A with `results` and `count`.
 
 ### `write_data` (Type A, HITL-gated)
 
 - **Purpose**: Atomic multi-operation writes using a validated `WriteIntent` (create/update/delete/upsert) with HITL approval.
 - **Use when**: Any DB mutation is required.
-- **Don’t use**: As a discovery tool. Always `inspect_schema` + `read_data` first.
+- **Don't use**: As a discovery tool. Always `inspect_schema` + `read_data` first.
 - **Filters (write operations)**:
   - Supported operator dicts: `in`, `eq`, `neq`, `gt`, `gte`, `lt`, `lte`
   - **Not supported**: `like/ilike` style string matching. Use `read_data(search_patterns=...)` to find IDs first, then update by `id in [...]`.
@@ -55,9 +55,9 @@ Agents must not assume every tool returns `{success: ...}`.
 
 ### `view_image` (Type C)
 
-- **Purpose**: View an image in-context (gives the agent “eyes”).
+- **Purpose**: View an image in-context (gives the agent "eyes").
 - **Use when**: You need to visually verify product/material/label/quality; before/after `image_studio`.
-- **Don’t use**: Metadata-only checks or bulk viewing.
+- **Don't use**: Metadata-only checks or bulk viewing.
 - **Returns**: Type C (multimodal blocks: text + image_url). Not success-wrapped.
 
 Example:
@@ -84,7 +84,7 @@ Example:
 ### `research_product_tool` (Type A)
 
 - **Purpose**: External web research for product specs, compliance, naming, etc.
-- **Use when**: You need facts you don’t have in DB.
+- **Use when**: You need facts you don't have in DB.
 - **Returns**: Type A with summary + sources.
 
 ### `extract_web_content_tool` (Type A)
